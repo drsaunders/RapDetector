@@ -13,8 +13,13 @@ from sklearn import cross_validation
 #%%
 def dumpWordsForTrack(lyrics,whichRow):
 	print lyrics['mxm_tids'][whichRow]
-	words = np.array(lyrics['unstemmed_terms'])[lyrics['tdm'][whichRow,:].nonzero()[1]]
+	track_lyrics = lyrics['tdm'][whichRow,:].toarray()[0]
+	order = np.argsort(track_lyrics)[::-1]
+	order = order[track_lyrics[order] > 0]
+	words = np.array(lyrics['unstemmed_terms'])[order]
 	print ' '.join(words)
+	print track_lyrics[order]
+	print np.sum(track_lyrics)
 #%%
 with open('test_track_info.pickle','r') as f:
 	track_info = pickle.load(f)
@@ -45,9 +50,31 @@ non_rap_tracks = non_rap_tracks.loc[sampled_nonrap_tracks,:]
 train_data = pd.concat([non_rap_tracks,track_info.loc[track_info.rap==1,:]],ignore_index=True)
 
 #%%
-# Create features
 
-train_data.loc[:,'total_num_words'] = lyrics['tdm'][train_data.tdm_row,:].sum(axis=1)
+def spotCheck(lyrics,train_data):
+	#%%
+	n = 5
+	c = []
+	s1 = train_data[train_data['rap'] == 1].index.values
+	np.random.shuffle(s1)
+	s2 = train_data[train_data['rap'] == 0].index.values
+	np.random.shuffle(s2)
+	
+	s = np.concatenate([s1[:n],s2[:n]])
+	
+	b = []
+	for i in s:
+		print "%s\t%s" % (train_data.loc[i,'track_name'],train_data.loc[i,'names'])
+		dumpWordsForTrack(lyrics, train_data.tdm_row[i])
+		b.append(lyrics['tdm'][train_data.tdm_row[i],:].sum(b))
+	#%%
+	
+# Create features
+total_num_words = np.zeros(len(train_data))
+for i in range(len(train_data)):
+	total_num_words[i] =  lyrics['tdm'][train_data.tdm_row[i],:].sum()
+	
+train_data.loc[:,'total_num_words'] = total_num_words
 
 word_lens = np.array([len(i) for i in lyrics['unstemmed_terms']],dtype=float)
 mean_word_length = np.zeros(len(train_data))
@@ -73,10 +100,16 @@ train_data.loc[:,'mean_word_instances'] = mean_word_instances
 
 #%%
 import seaborn as sns
-features = ['total_num_words']
-#a  = sns.pairplot(train_data.loc[:,['mean_num_words','mean_word_length','rap']], hue='rap', diag_kind="kde", kind="reg")
-a  = sns.pairplot(train_data.loc[:,features])
-
+#features = ['total_num_words']
+features = ['total_num_words','mean_word_length','rap']
+a  = sns.pairplot(train_data.loc[:,features], hue='rap', diag_kind="kde", kind="reg")
+features = ['median_word_rank','mean_word_instances','rap']
+a  = sns.pairplot(train_data.loc[:,features], hue='rap', diag_kind="kde", kind="reg")
+#a  = sns.pairplot(train_data.loc[:,features])
+#%%
+g = train_data.groupby('rap')
+print g.median()[features[:-1]]
+print g.sem()[features[:-1]]
 #%%
 from sklearn.ensemble import RandomForestClassifier
 features = ['total_num_words','mean_word_length','median_word_rank','mean_word_instances']
