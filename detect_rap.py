@@ -10,6 +10,8 @@ import pandas as pd
 import pickle
 import scipy.sparse
 from sklearn import cross_validation
+import matplotlib.pyplot as plt
+
 #%%
 def dumpWordsForTrack(lyrics,whichRow):
 	print lyrics['mxm_tids'][whichRow]
@@ -101,45 +103,49 @@ train_data.loc[:,'mean_word_instances'] = mean_word_instances
 #%%
 import seaborn as sns
 #features = ['total_num_words']
-features = ['total_num_words','mean_word_length','rap']
-a  = sns.pairplot(train_data.loc[:,features], hue='rap', diag_kind="kde", kind="reg")
-features = ['median_word_rank','mean_word_instances','rap']
-a  = sns.pairplot(train_data.loc[:,features], hue='rap', diag_kind="kde", kind="reg")
+sfeatures = ['total_num_words','mean_word_length','rap']
+a  = sns.pairplot(train_data.loc[:,sfeatures], hue='rap', diag_kind="kde", kind="reg")
+sfeatures = ['median_word_rank','mean_word_instances','rap']
+a  = sns.pairplot(train_data.loc[:,sfeatures], hue='rap', diag_kind="kde", kind="reg")
 #a  = sns.pairplot(train_data.loc[:,features])
 #%%
-g = train_data.groupby('rap')
-print g.median()[features[:-1]]
-print g.sem()[features[:-1]]
-#%%
-from sklearn.ensemble import RandomForestClassifier
 features = ['total_num_words','mean_word_length','median_word_rank','mean_word_instances']
-#features = ['mean_word_length','median_word_rank','mean_word_instances']
-#features = ['total_num_words']
 
+g = train_data.groupby('rap')
+print g.median()[features]
+print g.sem()[features]
+#%%
+# Fit random forest to all the data (not a good idea)
+from sklearn.ensemble import RandomForestClassifier
 
-#from sklearn.preprocessing import Imputer\
 clf = RandomForestClassifier(n_estimators=100)
 clf.fit(train_data.loc[:,features],train_data.loc[:,'rap'])
 prediction = clf.predict(train_data.loc[:,features])
 prop_corr = np.mean(prediction == train_data.loc[:,'rap'])
 print prop_corr
 #%%
+# Cross validate Random forest 
 from sklearn import cross_validation
 num_folds=10
 num_instances = len(train_data)
 scoring = 'accuracy'
 seed = 7
+clf = RandomForestClassifier(n_estimators=100)
 kfold = cross_validation.KFold(n=num_instances, shuffle=True, n_folds=num_folds, random_state=seed)
 results = cross_validation.cross_val_score(clf,train_data.loc[:,features], train_data.loc[:,'rap'], cv=kfold, scoring=scoring)
 print np.mean(results)
 
 #%%
+# Cross validate Logistic regression
+
 from sklearn.linear_model import LogisticRegression
 clf = LogisticRegression()
 results = cross_validation.cross_val_score(clf,train_data.loc[:,features], train_data.loc[:,'rap'], cv=kfold, scoring=scoring)
 print np.mean(results)
 
 #%%
+# Cross validate  SVM
+
 from sklearn import svm
 from sklearn import preprocessing
 scaler = preprocessing.StandardScaler().fit(train_data.loc[:,features])
@@ -148,75 +154,43 @@ train_data_scaled = scaler.transform(train_data.loc[:,features])
 clf = svm.SVC()
 results = cross_validation.cross_val_score(clf,train_data_scaled, train_data.loc[:,'rap'], cv=kfold, scoring=scoring)
 print np.mean(results)
-#%%
-
-# TSNE embedding
-from sklearn.manifold import TSNE
-import matplotlib.pyplot as plt
-
-tsne = TSNE()
-proj = tsne.fit_transform(train_data.loc[:,features])
-
-plt.figure() 
-plt.set_cmap("coolwarm")
-plt.scatter(proj[:, 0], proj[:, 1],s=10, c=train_data.loc[:,'rap'], alpha=0.5, edgecolors='face')
-plt.colorbar()
-
 
 #%%
+# Recursive number of features selection
+
+from sklearn.cross_validation import StratifiedKFold
+from sklearn.feature_selection import RFECV
+
+#clf = svm.SVC(kernel='linear')
+clf = RandomForestClassifier(n_estimators=100)
+clf.fit(train_data_scaled, train_data.loc[:,'rap'])
+rfecv = RFECV(estimator=clf, step=1, cv=StratifiedKFold(train_data.loc[:,'rap'], 2),
+              scoring='accuracy')
+rfecv.fit(train_data_scaled, train_data.loc[:,'rap'])
+
+print("Optimal number of features : %d" % rfecv.n_features_)
+# Plot number of features VS. cross-validation scores
+plt.figure()
+plt.xlabel("Number of features selected")
+plt.ylabel("Cross validation score (nb of correct classifications)")
+plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_)
+plt.show()
+
+order = np.argsort(clf.feature_importances_)[::-1]
+for i,o in enumerate(order):
+	print "%d %s\tImportance = %.2f" % (i+1, features[o], clf.feature_importances_[o])
+	
+#%%
+# TSNE embedding of the points onto a 2 plane
 #
+#from sklearn.manifold import TSNE
 #
+#tsne = TSNE()
+#proj = tsne.fit_transform(train_data.loc[:,features])
 #
-##%%
-#f = open('musicXmatch/mxm_779k_matches.txt','r')
-#track_artist_info = pd.DataFrame(columns=['tid','artistname','rap'])
-#for line in f:
-#	if line == '' or line.strip() == '':
-#		continue
-#	if line[0] in ('#', '%'):
-#		continue
-#	
-#	lineparts = line.strip().split('<SEP>')
-#	msdid = lineparts[0]
-#	artistname = lineparts[1]
-#	if msdid in tids:
-#		track_artist_info[]
-#	break
-#f.close()
-##%%
+#plt.figure() 
+#plt.set_cmap("coolwarm")
+#plt.scatter(proj[:, 0], proj[:, 1],s=10, c=train_data.loc[:,'rap'], alpha=0.5, edgecolors='face')
+#plt.colorbar()
 #
-#import sqlite3
-#import pandas as pd
-#import numpy as np
-#
-#con = sqlite3.connect('artist_term.db')
-#artist_tags = pd.read_sql('SELECT * FROM artist_mbtag',con)
-#artist_term = pd.read_sql('SELECT * FROM artist_term',con)
-#
-#termrap = np.array((artist_term.term == "rap") | (artist_term.term == "rapping") | (artist_term.term == "hiphop") |(artist_term.term == "hip hop"), dtype="int")
-#artist_term.loc[:,'rap'] = termrap
-#g = artist_term.groupby('artist_id')
-#artist_raps = pd.DataFrame(g['rap'].max())
-##%%
-##for aid in artist_raps.loc[artist_raps.rap==1].index:
-##    print(artist_term.loc[artist_term.artist_id==aid,:])
-#    
-#
-#mbtagrap = np.array((artist_tags.mbtag == "rap") | (artist_tags.mbtag == "rapping") | (artist_tags.mbtag == "hiphop") |(artist_tags.mbtag == "hip hop"), dtype="int")
-#artist_tags.loc[:,'rap'] = mbtagrap
-#g = artist_tags.groupby('artist_id')
-#artist_raps2 = pd.DataFrame(g['rap'].max())
-#
-#a = artist_raps.merge(artist_raps2,how='outer',left_index=True,right_index=True)
-#
-#artist_raps = pd.DataFrame({'artist_id':a.index, 'raps':(a.rap_x==1) | (a.rap_y==1)})
-#
-#con.close()
-##%%
-#
-#con = sqlite3.connect('track_metadata.db')
-#sql = 'SELECT track_id, artist_id FROM songs'
-#artist_tracks = pd.read_sql(sql,con)
-#
-#rap_tracks = artist_tracks.merge(artist_raps,how='left',on='artist_id')
-#con.close()
+
