@@ -11,6 +11,14 @@ import pickle
 import scipy.sparse
 from sklearn import cross_validation
 import matplotlib.pyplot as plt
+from sklearn import preprocessing
+import seaborn as sns
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.cross_validation import StratifiedKFold
+from sklearn.feature_selection import RFECV
+from sklearn import svm
+from sklearn.manifold import TSNE
 
 #%%
 def dumpWordsForTrack(lyrics,whichRow):
@@ -35,7 +43,7 @@ y = track_info.loc[:,'rap']
 num_rap_tracks = np.sum(y)
 all_rap_artists = np.unique(track_info.loc[track_info.rap==1,'spotify_artist_id'])
 all_nonrap_artists = np.unique(track_info.loc[track_info.rap==0,'spotify_artist_id'])
-#%%
+
 g=  track_info.groupby(by=['rap','spotify_artist_id']) 
 num_songs_per_artist = g.count()['mxm_tid']
 rap_songs_per_artist = np.mean(num_songs_per_artist[1])
@@ -101,7 +109,6 @@ train_data.loc[:,'mean_word_instances'] = mean_word_instances
 #train_data.loc[:,'weighted_median_word_rank'] = 
 
 #%%
-import seaborn as sns
 #features = ['total_num_words']
 sfeatures = ['total_num_words','mean_word_length','rap']
 a  = sns.pairplot(train_data.loc[:,sfeatures], hue='rap', diag_kind="kde", kind="reg")
@@ -115,8 +122,7 @@ g = train_data.groupby('rap')
 print g.median()[features]
 print g.sem()[features]
 #%%
-# Fit random forest to all the data (not a good idea)
-from sklearn.ensemble import RandomForestClassifier
+# Fit random forest to all the data and validate on the same data (not a good idea)
 
 clf = RandomForestClassifier(n_estimators=100)
 clf.fit(train_data.loc[:,features],train_data.loc[:,'rap'])
@@ -125,7 +131,6 @@ prop_corr = np.mean(prediction == train_data.loc[:,'rap'])
 print prop_corr
 #%%
 # Cross validate Random forest 
-from sklearn import cross_validation
 num_folds=10
 num_instances = len(train_data)
 scoring = 'accuracy'
@@ -137,17 +142,21 @@ print np.mean(results)
 
 #%%
 # Cross validate Logistic regression
+scaler = preprocessing.StandardScaler().fit(train_data.loc[:,features])
+train_data_scaled = scaler.transform(train_data.loc[:,features])
 
-from sklearn.linear_model import LogisticRegression
 clf = LogisticRegression()
-results = cross_validation.cross_val_score(clf,train_data.loc[:,features], train_data.loc[:,'rap'], cv=kfold, scoring=scoring)
-print np.mean(results)
 
+
+results = cross_validation.cross_val_score(clf,train_data_scaled, train_data.loc[:,'rap'], cv=kfold, scoring=scoring)
+print np.mean(results)
+# Check a fit
+splt = cross_validation.StratifiedShuffleSplit(train_data.loc[:,'rap'], test_size=0.1,n_iter=1, random_state=7)
+splt = next(iter(splt))
+fitinfo = clf.fit(train_data_scaled[splt[0],:], train_data.loc[splt[0],'rap'])
 #%%
 # Cross validate  SVM
 
-from sklearn import svm
-from sklearn import preprocessing
 scaler = preprocessing.StandardScaler().fit(train_data.loc[:,features])
 train_data_scaled = scaler.transform(train_data.loc[:,features])
 
@@ -157,9 +166,6 @@ print np.mean(results)
 
 #%%
 # Recursive number of features selection
-
-from sklearn.cross_validation import StratifiedKFold
-from sklearn.feature_selection import RFECV
 
 #clf = svm.SVC(kernel='linear')
 clf = RandomForestClassifier(n_estimators=100)
@@ -183,7 +189,6 @@ for i,o in enumerate(order):
 #%%
 # TSNE embedding of the points onto a 2 plane
 #
-#from sklearn.manifold import TSNE
 #
 #tsne = TSNE()
 #proj = tsne.fit_transform(train_data.loc[:,features])

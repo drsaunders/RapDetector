@@ -183,8 +183,8 @@ track_info = track_info.merge(pd.DataFrame({'tdm_row':range(len(lyrics['mxm_tids
 
 #%%
 # Save the generated data structures in pickle format
-with open('test_track_info.pickle','w') as f:
+with open('train_track_info.pickle','w') as f:
 	pickle.dump(track_info,f)
 #%%
-with open('test_lyrics_data.pickle','w') as f:
+with open('train_lyrics_data.pickle','w') as f:
 	pickle.dump(lyrics,f)
