@@ -188,3 +188,25 @@ with open('train_track_info.pickle','w') as f:
 #%%
 with open('train_lyrics_data.pickle','w') as f:
 	pickle.dump(lyrics,f)
+	
+	
+#%%
+# Start with a basic list of all the track ids in the musicXmatch lyrics database
+mxm_tids = load_mxm_tids('musicXmatch/mxm_dataset_test.txt')
+
+track_info = lookup_all_track_info(mxm_tids)
+
+# The row in the lyrics term-document matrix will be contiguous, because we
+# are about to filter out only the mxm_tids present in the track info.
+
+
+lyrics = load_lyrics('musicXmatch/mxm_dataset_test.txt', track_info.mxm_tid.values)
+track_info = track_info.merge(pd.DataFrame({'tdm_row':range(len(lyrics['mxm_tids'])),'mxm_tid':lyrics['mxm_tids']}),on='mxm_tid')
+
+#%%
+# Save the generated data structures in pickle format
+with open('test_track_info.pickle','w') as f:
+	pickle.dump(track_info,f)
+#%%
+with open('test_lyrics_data.pickle','w') as f:
+	pickle.dump(lyrics,f)
