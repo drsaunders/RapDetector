@@ -1,7 +1,7 @@
 Cross-Language Rap Detector
 ---------------------------
 
-![Histogram of total_num_words between rap and non-rap songs](total_num_words.svg)
+![Histogram of total_num_words between rap and non-rap songs](total_num_words.png)
 
 For my [RapItalia project](https://github.com/drsaunders/RapItalia), I made the claim that I could identify both Italian and English rap songs in my lyrics dataset using superficial features of the lyrics such as the total number of words. 
 
